@@ -1,7 +1,7 @@
 # Escrit — client
 
 Escrit is a marketplace for products, courses, and services with
-Flutterwave checkout and delivery-confirmed escrow. Sellers manage shipping
+Flutterwave/Paystack checkout and delivery-confirmed escrow. Sellers manage shipping
 or service appointments; buyers confirm completion or raise a dispute before
 funds are released. This is the buyer- and seller-facing web app: React,
 Vite and Tailwind, deployed on Vercel.

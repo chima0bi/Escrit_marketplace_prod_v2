@@ -55,7 +55,7 @@ const userSchema = new mongoose.Schema(
     promoCreditsKobo: { type: Number, min: 0, default: 0 },
 
     // Sparse so many email/password accounts can share a null googleId.
-    googleId: { type: String, default: null, unique: true, sparse: true },
+    googleId: { type: String },
 
     // True at once for Google accounts; email sign-ups verify with an OTP.
     emailVerified: { type: Boolean, default: false },
@@ -83,5 +83,12 @@ userSchema.set('toJSON', {
     return ret;
   },
 });
+
+// A plain `sparse` index still indexes an explicit null, so the second email sign-up
+// failed with E11000 (googleId: null). A partial index only covers real string IDs.
+userSchema.index(
+  { googleId: 1 },
+  { unique: true, partialFilterExpression: { googleId: { $type: 'string' } }, name: 'googleId_unique_string' },
+);
 
 export const User = mongoose.model('User', userSchema);
