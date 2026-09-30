@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Escrit — products, courses, services, protected by escrow</title>
+    <meta
+      name="description"
+      content="Shop products, discover courses, and book services from independent sellers. Eligible payments are protected by escrow until fulfillment is confirmed."
+    />
+    <meta name="theme-color" content="#F6F9F5" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0F1713" media="(prefers-color-scheme: dark)" />
+    <meta name="robots" content="index, follow" />
+    <!-- NOTE: replace with the real production domain once deployed —
+         also update client/public/sitemap.xml and robots.txt to match. -->
+    <link rel="canonical" href="https://escrit.example.com/" />
+
+    <!-- Open Graph / social previews -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Escrit" />
+    <meta property="og:title" content="Escrit Marketplace — shop and book with confidence" />
+    <meta
+      property="og:description"
+      content="Shop products, learn with courses, and book services from independent sellers. Escrow protects eligible payments until fulfillment is confirmed."
+    />
+    <meta property="og:image" content="/logo-full.png" />
+    <meta property="og:url" content="https://escrit.example.com/" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Escrit Marketplace — shop and book with confidence" />
+    <meta
+      name="twitter:description"
+      content="A marketplace for products, courses, and services, with escrow protection built into eligible checkout."
+    />
+    <meta name="twitter:image" content="/logo-full.png" />
+
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <!-- Google Identity Services — powers the "Continue with Google"
+         button (see components/GoogleSignInButton.jsx). Loaded here
+         rather than dynamically injected so it's warm by the time
+         Login/Register mount. Harmless (renders nothing) if
+         VITE_GOOGLE_CLIENT_ID isn't set for a given deployment. -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+    <!-- Resolve + apply the theme class BEFORE React mounts and before
+         first paint, so there's no flash of the wrong theme on load or
+         refresh. Mirrors the exact resolution logic in ThemeContext.jsx. -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('escrit_theme') || 'system';
+          var resolved = stored === 'system'
+            ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+            : stored;
+          if (resolved === 'dark') document.documentElement.classList.add('dark');
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body class="bg-paper text-ink font-sans antialiased">
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

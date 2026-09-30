@@ -1,0 +1,336 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =====================================================================
+   Theme tokens — light is the default (:root), dark ("vault") lives
+   under html.dark. ThemeContext.jsx is the only thing that ever
+   touches that class; nothing else in the app should reference
+   "light"/"dark" directly. Values are "R G B" triples so Tailwind's
+   `rgb(var(--x) / <alpha-value>)` pattern can vary opacity per-utility
+   (e.g. bg-seal/40) without needing a second variable per color.
+   ===================================================================== */
+:root {
+  --color-forest-50: 238 246 239;
+  --color-forest-100: 221 235 222;
+  --color-forest-700: 36 91 62;
+  --color-forest-800: 26 70 49;
+  --color-forest-900: 18 53 37;
+  --color-forest-950: 12 37 27;
+  --color-ochre: 212 162 76;
+  --color-ink: 24 47 35;             /* deep forest ink */
+  --color-paper: 246 249 245;        /* cool botanical white */
+  --color-surface: 255 255 255;      /* card fill */
+  --color-input: 255 255 255;        /* form field fill */
+  --color-line: 224 232 224;         /* green-gray hairline borders */
+  --color-line-strong: 194 207 194;  /* stronger field/button borders */
+  --color-seal: 217 119 6;           /* amber — held in escrow */
+  --color-released: 5 150 105;       /* emerald — released / success */
+  --color-dispute: 220 38 38;        /* coral-red — disputed / needs attention */
+
+  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-card-md: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --shadow-card-lg: 0 10px 15px -3px rgb(0 0 0 / 0.05), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+}
+
+html.dark {
+  --color-forest-50: 30 48 37;
+  --color-forest-100: 38 62 46;
+  --color-forest-700: 119 174 132;
+  --color-forest-800: 42 82 57;
+  --color-forest-900: 24 58 39;
+  --color-forest-950: 10 28 19;
+  --color-ochre: 225 178 94;
+  --color-ink: 235 241 234;          /* pale leaf text */
+  --color-paper: 15 23 19;           /* deep forest vault */
+  --color-surface: 24 35 29;
+  --color-input: 20 31 25;
+  --color-line: 43 59 47;
+  --color-line-strong: 64 82 67;
+  --color-seal: 255 179 0;
+  --color-released: 0 230 118;
+  --color-dispute: 255 92 92;
+
+  --shadow-card: none;
+  --shadow-card-md: none;
+  --shadow-card-lg: none;
+}
+
+/* One deliberate structural motif, used everywhere something shows
+   escrow/money state. Light mode: a soft, lightly-shadowed surface
+   card on an off-white page ("open book" audit feel). Dark mode: a
+   translucent glass panel over the vault background, so status reads
+   like looking into a sealed case. */
+.certificate {
+  @apply border border-line bg-surface rounded-lg shadow-card dark:bg-surface/80 dark:backdrop-blur-xl dark:shadow-none;
+}
+
+.eyebrow {
+  @apply text-[11px] font-semibold uppercase tracking-[0.12em] text-forest-700 dark:text-seal;
+}
+
+.market-hero {
+  background-color: rgb(var(--color-forest-800));
+  background-image:
+    linear-gradient(115deg, rgb(var(--color-forest-950) / 0.95), rgb(var(--color-forest-800) / 0.88) 58%, rgb(var(--color-forest-700) / 0.75)),
+    repeating-linear-gradient(135deg, transparent 0 36px, rgb(255 255 255 / 0.025) 36px 37px);
+}
+
+.carousel-arrow {
+  @apply absolute top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/30 bg-forest-950/55 text-white backdrop-blur transition hover:bg-forest-950/85 focus-visible:outline-white;
+}
+
+.reveal-on-scroll {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 520ms ease-out var(--reveal-delay, 0ms), transform 520ms cubic-bezier(0.2, 0.65, 0.3, 1) var(--reveal-delay, 0ms);
+}
+
+.reveal-on-scroll.is-revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+input,
+select,
+textarea {
+  @apply rounded-lg transition-shadow duration-150;
+}
+input:focus,
+select:focus,
+textarea:focus {
+  @apply outline-none ring-2 ring-seal/15;
+}
+
+.font-display {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* Dark vault background: two very faint radial glows (amber, emerald)
+   echoing the two states that matter most. Light mode stays a flat
+   off-white — the glow is a dark-mode-only accent. */
+body {
+  @apply bg-paper text-ink;
+}
+html.dark body {
+  background-image:
+    linear-gradient(145deg, rgb(var(--color-forest-950) / 0.46), transparent 52%),
+    repeating-linear-gradient(135deg, transparent 0 48px, rgb(255 255 255 / 0.012) 48px 49px);
+  background-attachment: fixed;
+}
+
+@keyframes featured-progress {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+:focus-visible {
+  outline: 2px solid rgb(var(--color-seal));
+  outline-offset: 2px;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-on-scroll {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .featured-rail *,
+  .market-hero * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Safety net against horizontal overflow on narrow screens: item
+   names, descriptions, dispute reasons and resolution notes are all
+   free-text the user typed, so a single long unbroken word (a URL
+   pasted with no spaces, a run-on string) can otherwise push wider
+   than its container regardless of the `break-words` utility already
+   applied at each call site. This is the last line of defense, not a
+   substitute for those — Tailwind's `break-words` still governs
+   *where* text prefers to wrap; this only stops a genuinely unbreakable
+   token from overflowing when it has to. */
+.certificate,
+input,
+textarea {
+  overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* --- Skeleton loading (replaces bare "Loading..." text) ------------- */
+.skeleton {
+  @apply bg-line/50 relative overflow-hidden rounded-lg;
+  background-image: linear-gradient(
+    90deg,
+    rgba(226, 232, 240, 0.4) 0%,
+    rgba(226, 232, 240, 0.9) 50%,
+    rgba(226, 232, 240, 0.4) 100%
+  );
+  background-size: 800px 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+html.dark .skeleton {
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.02) 0%,
+    rgba(255, 255, 255, 0.07) 50%,
+    rgba(255, 255, 255, 0.02) 100%
+  );
+}
+
+/* --- Spotlight onboarding tour --------------------------------------- */
+.tour-overlay-hole {
+  position: fixed;
+  pointer-events: none;
+  border-radius: 12px;
+  box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.55);
+  transition: top 0.35s cubic-bezier(0.65, 0, 0.35, 1),
+    left 0.35s cubic-bezier(0.65, 0, 0.35, 1),
+    width 0.35s cubic-bezier(0.65, 0, 0.35, 1),
+    height 0.35s cubic-bezier(0.65, 0, 0.35, 1);
+  z-index: 60;
+}
+html.dark .tour-overlay-hole {
+  border-radius: 14px;
+  box-shadow: 0 0 0 9999px rgba(4, 6, 11, 0.82);
+}
+
+.tour-ring {
+  position: fixed;
+  pointer-events: none;
+  border-radius: 12px;
+  border: 2px solid #d97706;
+  transition: top 0.35s cubic-bezier(0.65, 0, 0.35, 1),
+    left 0.35s cubic-bezier(0.65, 0, 0.35, 1),
+    width 0.35s cubic-bezier(0.65, 0, 0.35, 1),
+    height 0.35s cubic-bezier(0.65, 0, 0.35, 1);
+  z-index: 61;
+  animation: pulseSoft 2.2s ease-in-out infinite;
+}
+html.dark .tour-ring {
+  border-radius: 14px;
+  border-color: #ffb300;
+  box-shadow: 0 0 16px rgba(255, 179, 0, 0.35);
+}
+
+/* --- Escrow lifecycle stepper ---------------------------------------- */
+.lifecycle-dot {
+  @apply w-2.5 h-2.5 rounded-full border-2 border-line bg-paper transition-colors duration-300;
+}
+.lifecycle-dot.is-active {
+  @apply border-seal bg-seal;
+}
+.lifecycle-dot.is-done {
+  @apply border-released bg-released;
+}
+html.dark .lifecycle-dot.is-active {
+  box-shadow: 0 0 10px rgba(255, 179, 0, 0.55);
+}
+html.dark .lifecycle-dot.is-done {
+  box-shadow: 0 0 8px rgba(0, 230, 118, 0.45);
+}
+.lifecycle-line {
+  @apply flex-1 h-0.5 bg-line transition-colors duration-500;
+}
+.lifecycle-line.is-done {
+  @apply bg-released;
+}
+html.dark .lifecycle-line.is-done {
+  box-shadow: 0 0 6px rgba(0, 230, 118, 0.4);
+}
+
+/* --- Ambient background marks ---------------------------------------
+   Very low-opacity brand marks that drift slowly and fizzle out,
+   purely decorative depth behind page content. See
+   components/AmbientBackground.jsx, which positions and randomizes
+   these; this just defines the shared motion + non-interference.
+
+   IMPORTANT: this @keyframes is defined here as plain CSS, NOT left to
+   Tailwind's `theme.extend.keyframes` (tailwind.config.js also has a
+   same-named one for reference/documentation only). Tailwind only
+   emits a keyframes block when something in the scanned content uses
+   the matching `animate-*` utility class — nothing does, since this
+   component references the animation by its raw CSS name via the
+   `.ambient-mark` class below, not a Tailwind utility. Left to
+   Tailwind alone, the keyframes get purged from the production build
+   entirely, which silently drops the animation and leaves every mark
+   frozen at the browser's default opacity of 1 (fully opaque) instead
+   of the intended ~3% — that was the bug that made these marks
+   obstruct page content. Defining it as raw CSS here means it always
+   ships, regardless of what Tailwind's scanner sees.
+
+   --ambient-opacity-mult: near-black ink on the near-white "paper"
+   background (light mode) reads as almost nothing at the same alpha
+   that's clearly visible as near-white ink on the near-black "vault"
+   background (dark mode) — low-alpha dark-on-light has much lower
+   perceived contrast than low-alpha light-on-dark at the same number.
+   Rather than one alpha number that's a compromise in both modes,
+   light mode gets a multiplier on top of the same per-mark base value
+   AmbientBackground.jsx computes, so the marks are actually visible
+   without dark mode's already-fine marks getting any stronger. */
+:root {
+  --ambient-opacity-mult: 2.2;
+}
+html.dark {
+  --ambient-opacity-mult: 1;
+}
+
+.ambient-mark {
+  position: fixed;
+  pointer-events: none;
+  z-index: 0;
+  /* Static floor in case the animation is ever unavailable for any
+     reason (e.g. an old browser) — never rely on the animation alone
+     to keep these out of the way of page content. */
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: driftFizzle var(--drift-duration, 26s) ease-in-out infinite;
+  animation-delay: var(--drift-delay, 0s);
+}
+
+@keyframes driftFizzle {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.92) rotate(0deg);
+  }
+  15% {
+    opacity: calc(var(--drift-max-opacity, 0.035) * var(--ambient-opacity-mult, 1));
+  }
+  50% {
+    opacity: calc(var(--drift-max-opacity, 0.035) * var(--ambient-opacity-mult, 1));
+    transform: translate(var(--drift-x, 20vw), var(--drift-y, -14vh)) scale(1.04) rotate(4deg);
+  }
+  85% {
+    opacity: calc(var(--drift-max-opacity, 0.035) * var(--ambient-opacity-mult, 1));
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(var(--drift-x, 20vw) * 1.7), calc(var(--drift-y, -14vh) * 1.7)) scale(1.08) rotate(7deg);
+  }
+}
+
+/* Reduced motion: keep the marks present but static and at their
+   floor opacity rather than snapping through the whole keyframe list
+   near-instantly (which is what "animation-duration: 0.001ms" from
+   the global rule above would otherwise do). */
+@media (prefers-reduced-motion: reduce) {
+  .ambient-mark {
+    animation: none;
+    opacity: calc(var(--drift-max-opacity, 0.035) * var(--ambient-opacity-mult, 1) * 0.7);
+    transform: none;
+  }
+}

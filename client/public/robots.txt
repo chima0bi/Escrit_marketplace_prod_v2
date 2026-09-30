@@ -1,0 +1,18 @@
+# Escrit is mostly a signed-in / one-off-link product — there is very
+# little here worth a crawler's time, and buyer-order and seller
+# dashboard URLs should never show up in search results (they're
+# effectively bearer links / private account data). Only the marketing
+# entry points (home, login, register) are left crawlable.
+User-agent: *
+Allow: /$
+Allow: /login$
+Allow: /register$
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /r/
+Disallow: /verify-email
+Disallow: /forgot-password
+Disallow: /reset-password
+
+# NOTE: replace with the real production domain once deployed.
+Sitemap: https://escrit.example.com/sitemap.xml

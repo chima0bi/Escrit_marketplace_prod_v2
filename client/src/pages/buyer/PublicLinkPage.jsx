@@ -1,0 +1,457 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
+import { api } from '../../lib/api.js';
+import StatusBadge from '../../components/StatusBadge.jsx';
+import LifecycleStepper from '../../components/LifecycleStepper.jsx';
+import DisputePolicyNote from '../../components/DisputePolicyNote.jsx';
+import SpotlightTour from '../../components/SpotlightTour.jsx';
+import ItemPhoto from '../../components/ItemPhoto.jsx';
+import PhotoField from '../../components/PhotoField.jsx';
+import { LockIcon, ShieldCheckIcon, ClockIcon } from '../../components/icons.jsx';
+import { usePageTitle } from '../../lib/usePageTitle.js';
+import { useAuthContext } from '../../lib/AuthContext.jsx';
+import GoogleSignInButton from '../../components/GoogleSignInButton.jsx';
+
+const TOUR_STEPS = [
+  {
+    selector: '[data-tour="trust-strip"]',
+    title: 'Your money is held, not sent to the seller',
+    body: 'Escrit sits between you and the seller. Paying does not hand them your money yet.',
+  },
+  {
+    selector: '[data-tour="verified-name"]',
+    title: 'The seller is bank-verified',
+    body: 'This name was confirmed with their bank before you saw this page, so a fake account cannot collect your money.',
+  },
+  {
+    selector: '[data-tour="pay-action"]',
+    title: 'What happens after you pay',
+    body: 'The seller marks delivery or service completion. You confirm the outcome or raise a dispute before funds are released.',
+  },
+];
+
+// A link is shared by many buyers, so it has no status of its own.
+// Starting checkout creates an order (transaction) for this buyer, and
+// this page then follows that order. Keep the order id in localStorage so a
+// redirect back from the selected provider can reopen this buyer's order.
+function lastOrderKey(linkId) {
+  return `escrit_last_order:${linkId}`;
+}
+
+export default function PublicLinkPage() {
+  const { linkId, txId } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { status: authStatus, login } = useAuthContext();
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+  const [paying, setPaying] = useState(false);
+  const [actionError, setActionError] = useState(null);
+  const [confirming, setConfirming] = useState(false);
+  const [disputeOpen, setDisputeOpen] = useState(false);
+  const [disputeReason, setDisputeReason] = useState('');
+  const [evidenceText, setEvidenceText] = useState('');
+  const [evidenceUrl, setEvidenceUrl] = useState('');
+  const [kycRequired, setKycRequired] = useState(false);
+  const [googleCreated, setGoogleCreated] = useState(false);
+  const [noShowReason, setNoShowReason] = useState('');
+  const [disputing, setDisputing] = useState(false);
+  const pollRef = useRef(null);
+
+  usePageTitle(data?.link?.itemName || 'Pay securely', { suffix: !data?.link?.itemName });
+
+  // On the bare product page, jump to this buyer's saved order if there is one.
+  useEffect(() => {
+    if (txId) return;
+    const savedTxId = localStorage.getItem(lastOrderKey(linkId));
+    if (savedTxId) navigate(`/r/${linkId}/t/${savedTxId}`, { replace: true });
+  }, [linkId, txId, navigate]);
+
+  useEffect(() => {
+    let cancelled = false;
+    function load(silent) {
+      const fetcher = txId ? api.getPublicTransaction(linkId, txId) : api.getPublicLink(linkId);
+      fetcher
+        .then((d) => !cancelled && setData(d))
+        .catch((err) => !cancelled && !silent && setError(err.message));
+    }
+    load(false);
+    pollRef.current = setInterval(() => load(true), 8000);
+    return () => {
+      cancelled = true;
+      clearInterval(pollRef.current);
+    };
+  }, [linkId, txId]);
+
+  async function pay(e) {
+    e.preventDefault();
+    if (authStatus !== 'authed') {
+      const next = encodeURIComponent(location.pathname);
+      navigate(`/login?next=${next}`);
+      return;
+    }
+    setActionError(null);
+    setPaying(true);
+    try {
+      const { authorizationUrl, transactionId } = await api.checkout(linkId);
+      localStorage.setItem(lastOrderKey(linkId), transactionId);
+      window.location.href = authorizationUrl; // selected provider's hosted checkout
+    } catch (err) {
+      setActionError(err.message);
+      setKycRequired(err.message.toLowerCase().includes('identity details'));
+      setPaying(false);
+    }
+  }
+
+  const signInWithGoogle = useCallback(async (idToken) => {
+    setActionError(null);
+    try {
+      const { accessToken, accountCreated } = await api.googleLogin(idToken);
+      await login(accessToken);
+      setGoogleCreated(accountCreated);
+    } catch (err) {
+      setActionError(err.message || 'Google sign-in could not be completed.');
+    }
+  }, [login]);
+
+  async function confirmReceipt() {
+    setActionError(null);
+    setConfirming(true);
+    try {
+      const { transaction } = await api.confirmReceipt(linkId, txId);
+      setData((d) => ({ ...d, transaction: { ...d.transaction, status: transaction.status } }));
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setConfirming(false);
+    }
+  }
+
+  async function submitDispute(e) {
+    e.preventDefault();
+    if (disputeReason.trim().length < 5) {
+      setActionError('Please describe the problem in at least 5 characters.');
+      return;
+    }
+    setActionError(null);
+    setDisputing(true);
+    try {
+      const { transaction } = await api.raiseDispute(linkId, txId, {
+        reason: disputeReason.trim(),
+        evidenceText,
+        evidenceUrl,
+      });
+      setData((d) => ({ ...d, transaction }));
+      setDisputeOpen(false);
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setDisputing(false);
+    }
+  }
+
+  async function addMoreEvidence(event) {
+    event.preventDefault();
+    setActionError(null);
+    setDisputing(true);
+    try {
+      const { transaction } = await api.submitBuyerEvidence(linkId, txId, { text: evidenceText, mediaUrl: evidenceUrl });
+      setData((current) => ({ ...current, transaction }));
+      setEvidenceText('');
+      setEvidenceUrl('');
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setDisputing(false);
+    }
+  }
+
+  async function submitNoShowReason(event) {
+    event.preventDefault();
+    setActionError(null);
+    setDisputing(true);
+    try {
+      const { transaction: updated } = await api.reportServiceNoShow(linkId, txId, { reason: noShowReason.trim() });
+      setData((current) => ({ ...current, transaction: updated }));
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setDisputing(false);
+    }
+  }
+
+  if (error) return <p className="text-dispute text-sm" role="alert">{error}</p>;
+  if (!data) {
+    return (
+      <div className="space-y-4" aria-busy="true" aria-label="Loading payment link">
+        <div className="skeleton h-64 w-full" />
+        <div className="skeleton h-12 w-full" />
+      </div>
+    );
+  }
+
+  const { link, seller, transaction } = data;
+  const status = transaction?.status; // undefined until checkout starts
+
+  return (
+    <div className="animate-fade-in-up">
+      <div
+        data-tour="trust-strip"
+        className="flex items-center justify-center gap-4 sm:gap-6 text-[11px] sm:text-xs text-ink/60 mb-5 flex-wrap"
+      >
+        <span className="flex items-center gap-1.5">
+          <LockIcon width={14} height={14} /> Funds held, not sent directly
+        </span>
+        <span className="flex items-center gap-1.5">
+          <ShieldCheckIcon width={14} height={14} /> Bank-verified seller
+        </span>
+        <span className="flex items-center gap-1.5">
+          <ClockIcon width={14} height={14} /> Funds release after delivery confirmation
+        </span>
+      </div>
+
+      <div className="certificate p-6 mb-6">
+        <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
+          <div className="min-w-0">
+            <h1 className="font-display text-2xl break-words">{link.itemName}</h1>
+            {link.itemDescription && <p className="text-ink/70 mt-1 break-words">{link.itemDescription}</p>}
+          </div>
+          {status && <StatusBadge status={status} />}
+        </div>
+
+        <ItemPhoto
+          src={link.itemPhotoUrl}
+          alt={link.itemName}
+          className="w-full max-h-72 object-cover border border-line rounded-xl mb-4"
+        />
+
+        <p className="text-3xl font-mono font-medium mb-1">{link.checkoutPriceKobo == null ? 'Price unavailable' : `₦${(link.checkoutPriceKobo / 100).toLocaleString()}`}</p>
+        {link.fulfillmentType === 'product' && link.refundable && (
+          <p className="mb-4 text-xs text-ink/55">Refundable pickup: if the seller records a no-show, 95% of the item price is automatically refunded and a disclosed 5% no-show fee is retained.</p>
+        )}
+
+        {status && (
+          <div className="mb-4">
+            <LifecycleStepper status={status} />
+          </div>
+        )}
+
+        <div className="text-sm border-t border-line pt-4 min-w-0" data-tour="verified-name">
+          <p className="text-ink/60">Seller details</p>
+          <p className="font-medium break-words">{seller.businessName}</p>
+          {seller.verifiedAccountName && (
+            <p className="text-ink/60 mt-1 flex items-start gap-1.5 break-words">
+              <ShieldCheckIcon width={14} height={14} className="text-released shrink-0 mt-0.5" />
+              <span>Bank-verified as <span className="text-ink font-medium">{seller.verifiedAccountName}</span></span>
+            </p>
+          )}
+        </div>
+      </div>
+
+      {location.state?.accountCreated && (
+        <p role="status" className="mb-4 rounded-lg border border-released/40 bg-released-soft px-4 py-3 text-sm text-released">
+          Your Escrit account has been created. Continue with your purchase below.
+        </p>
+      )}
+      {googleCreated && <p role="status" className="mb-4 rounded-lg border border-released/40 bg-released-soft px-4 py-3 text-sm text-released">Your Escrit account was created with Google. Continue to secure checkout below.</p>}
+
+      <div data-tour="pay-action">
+        {!status && link.active && link.checkoutPriceKobo != null && (
+          authStatus === 'authed' ? (
+            <form onSubmit={pay} className="space-y-3">
+              <button disabled={paying || seller.demoOnly} className="w-full bg-ink text-paper py-3 font-medium disabled:opacity-50 hover:bg-ink/90 transition-colors rounded-lg">
+                {paying ? 'Redirecting to secure checkout…' : link.fulfillmentType === 'product' || link.fulfillmentType === 'course' ? 'Buy with escrow' : 'Book and pay directly'}
+              </button>
+              <p className="text-xs text-ink/50 text-center">{link.fulfillmentType === 'product' ? 'Your payment stays held until product delivery is confirmed.' : link.fulfillmentType === 'course' ? 'Your course access is released after payment is verified.' : 'Your service payment is sent directly to the seller after the charge is confirmed.'}</p>
+              {seller.demoOnly && <p className="text-xs text-seal text-center">Demo seller listing. Real checkout is disabled.</p>}
+            </form>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-ink/65">Sign in or create an account to save this order and continue to secure checkout.</p>
+              <GoogleSignInButton onCredential={signInWithGoogle} onError={setActionError} />
+              <Link to={`/login?next=${encodeURIComponent(location.pathname)}`} className="block w-full rounded-lg bg-ink px-4 py-3 text-center text-sm font-medium text-paper">Sign in to buy</Link>
+              <Link to={`/register?intent=buyer&next=${encodeURIComponent(location.pathname)}`} className="block w-full rounded-lg border border-line px-4 py-3 text-center text-sm font-medium">Create buyer account</Link>
+            </div>
+          )
+        )}
+
+        {!status && link.active && link.checkoutPriceKobo == null && <p className="certificate p-4 text-sm text-seal">Secure checkout is temporarily unavailable while the final price is refreshed.</p>}
+
+        {!status && !link.active && (
+          <p className="text-sm text-ink/70 certificate p-4">
+            This link is no longer accepting new orders.
+          </p>
+        )}
+
+        {status === 'CREATED' && (
+          <p className="text-sm text-ink/70 certificate p-4">
+            Awaiting confirmation of your payment. This updates automatically.
+          </p>
+        )}
+
+        {status === 'DIRECT_PAID' && (
+          <div className="space-y-4">
+            <p className="certificate p-4 text-sm text-ink/70">Payment was confirmed and sent directly to the seller. This course/service purchase is not held in escrow.</p>
+            {link.fulfillmentType === 'service' && <p className="text-sm text-ink/65">The seller will coordinate your requested appointment directly. You can track completion from My orders.</p>}
+            {data.courseAccess && <CourseAccess course={data.courseAccess} />}
+          </div>
+        )}
+
+        {status === 'DIRECT_COMPLETED' && <div className="certificate p-4 text-sm text-ink/70">The service provider marked your direct booking complete. Your payment was settled directly after checkout.</div>}
+
+        {status === 'PAID_HELD' && (
+          <div className="space-y-3">
+            {data.courseAccess && <CourseAccess course={data.courseAccess} />}
+            {transaction.fulfillmentStatus !== 'NOT_STARTED' && (
+              <div className="certificate p-4 space-y-1 text-sm">
+                <p className="font-medium">Fulfillment: {transaction.fulfillmentStatus.replace(/_/g, ' ').toLowerCase()}</p>
+                {transaction.trackingReference && <p className="text-ink/65">Tracking: {transaction.trackingReference}</p>}
+                {transaction.fulfillmentNote && <p className="text-ink/65">{transaction.fulfillmentNote}</p>}
+                {transaction.deliveryProofUrl && <a className="underline underline-offset-4" href={transaction.deliveryProofUrl} target="_blank" rel="noreferrer">View delivery evidence</a>}
+              </div>
+            )}
+            {transaction.fulfillmentStatus === 'BUYER_NO_SHOW' && link.fulfillmentType === 'service' && (
+              <form onSubmit={submitNoShowReason} className="certificate space-y-3 border border-seal/30 p-4">
+                <div>
+                  <p className="font-medium">The seller recorded a missed service appointment</p>
+                  <p className="mt-1 text-sm text-ink/65">Explain what happened to request a full refund before {transaction.noShowResponseDueAt ? new Date(transaction.noShowResponseDueAt).toLocaleString() : 'the response period ends'}.</p>
+                </div>
+                <label className="block text-sm">
+                  <span className="text-ink/65">Your reason</span>
+                  <textarea required minLength={5} maxLength={500} rows={3} value={noShowReason} onChange={(event) => setNoShowReason(event.target.value)} className="mt-1 w-full border border-line bg-input px-3 py-2 rounded-lg" />
+                </label>
+                <button disabled={disputing} className="w-full rounded-lg bg-ink px-4 py-3 text-sm font-medium text-paper disabled:opacity-50">{disputing ? 'Submitting…' : 'Submit reason and request full refund'}</button>
+              </form>
+            )}
+            {transaction.fulfillmentStatus === 'BUYER_NO_SHOW' && link.fulfillmentType === 'product' && !link.refundable && (
+              <p className="certificate p-4 text-sm text-ink/70">This pickup was listed as non-refundable. The seller will choose to receive the item price or convert 90% into Escrit promotion credits.</p>
+            )}
+            {['DELIVERED', 'SERVICE_COMPLETE'].includes(transaction.fulfillmentStatus) ? (
+              <>
+                <p className="text-sm text-ink/70">Your payment remains held. Confirm when delivery or the service is complete, or raise a dispute if something is wrong.</p>
+                <button
+                  onClick={confirmReceipt}
+                  disabled={confirming}
+                  className="w-full bg-released text-paper py-3 font-medium hover:bg-released/90 transition-colors disabled:opacity-50 rounded-lg"
+                >
+                  {confirming ? 'Releasing payment…' : 'Confirm completion and release payment'}
+                </button>
+              </>
+            ) : (
+              <p className="text-sm text-ink/70 certificate p-4">Your payment is held. The seller will update you when delivery or the service meeting is ready. There is no payment-time auto-release.</p>
+            )}
+            {link.fulfillmentType === 'course' && !link.refundable ? (
+              <p className="certificate p-4 text-sm text-ink/60">This course is non-refundable. Escrow dispute support is not available for this purchase.</p>
+            ) : !disputeOpen ? (
+              <div className="space-y-3">
+                <button
+                  onClick={() => setDisputeOpen(true)}
+                  className="w-full border border-dispute text-dispute py-3 font-medium hover:bg-dispute hover:text-paper transition-colors rounded-lg"
+                >
+                  Something is wrong
+                </button>
+                <DisputePolicyNote />
+              </div>
+            ) : (
+              <form onSubmit={submitDispute} className="certificate p-4 border-dispute/40 space-y-3 animate-fade-in-up">
+                <label className="block">
+                  <span className="text-sm text-ink/70">What is wrong with the order?</span>
+                  <textarea
+                    required
+                    rows={3}
+                    value={disputeReason}
+                    onChange={(e) => setDisputeReason(e.target.value)}
+                    className="mt-1 w-full border border-line px-3 py-2 bg-input focus:border-dispute/60 rounded-lg"
+                    placeholder="Item never arrived, does not match the description..."
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-sm text-ink/70">Supporting details <span className="text-ink/40">(optional)</span></span>
+                  <textarea rows={2} maxLength={2000} value={evidenceText} onChange={(event) => setEvidenceText(event.target.value)} className="mt-1 w-full border border-line px-3 py-2 bg-input" placeholder="Add context that helps explain your report." />
+                </label>
+                <div><p className="mb-1 text-sm text-ink/70">Photo evidence <span className="text-ink/40">(optional)</span></p><PhotoField value={evidenceUrl} onChange={setEvidenceUrl} /></div>
+                <div className="flex flex-col xs:flex-row gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDisputeOpen(false)}
+                    className="flex-1 border border-line py-2 text-sm font-medium hover:border-ink transition-colors rounded-lg"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    disabled={disputing}
+                    className="flex-1 bg-dispute text-paper py-2 text-sm font-medium disabled:opacity-50 hover:bg-dispute/90 transition-colors rounded-lg"
+                  >
+                    {disputing ? 'Submitting…' : 'Submit dispute'}
+                  </button>
+                </div>
+                <p className="text-xs text-ink/50">
+                  This freezes the release immediately. Your payment stays held while it is reviewed.
+                </p>
+                <DisputePolicyNote compact />
+              </form>
+            )}
+          </div>
+        )}
+
+        {status === 'DISPUTED' && (
+          <div className="space-y-3">
+            <div className="text-sm text-ink/70 certificate p-4 bg-dispute-soft border-dispute/40 space-y-2">
+              <p>{transaction.complaintLogged ? 'Delivery was already confirmed, so the seller was paid. Your complaint is recorded for Escrit admin review.' : 'Your dispute was submitted and the release is frozen. Your payment stays held during the review.'}</p>
+              {transaction.disputeReason && (
+                <p className="text-xs text-ink/60 break-words">
+                  <span className="font-medium text-ink/70">What you reported: </span>
+                  {transaction.disputeReason}
+                </p>
+              )}
+              {transaction.disputeRaisedAt && (
+                <p className="text-xs text-ink/50">
+                  Submitted {new Date(transaction.disputeRaisedAt).toLocaleString()}
+                </p>
+              )}
+              {transaction.evidence?.length > 0 && <ul className="space-y-2 border-t border-dispute/20 pt-3">{transaction.evidence.map((entry) => <li key={entry._id} className="text-xs text-ink/70"><p><strong>{entry.party === 'buyer' ? 'Your evidence' : 'Seller evidence'}:</strong> {entry.text || 'Media attached'}</p>{entry.mediaUrl && <a href={entry.mediaUrl} target="_blank" rel="noreferrer" className="mt-1 inline-block underline underline-offset-2">Open attachment</a>}</li>)}</ul>}
+            </div>
+            <form onSubmit={addMoreEvidence} className="certificate space-y-3 p-4"><p className="text-sm font-medium">Add evidence to your open dispute</p><textarea value={evidenceText} onChange={(event) => setEvidenceText(event.target.value)} rows={2} maxLength={2000} className="w-full border border-line bg-input px-3 py-2 text-sm" placeholder="Add details or context" /><PhotoField value={evidenceUrl} onChange={setEvidenceUrl} /><button disabled={disputing || (!evidenceText.trim() && !evidenceUrl)} className="rounded-lg border border-line px-3 py-2 text-sm font-medium disabled:opacity-50">{disputing ? 'Submitting…' : 'Submit evidence'}</button></form>
+            <DisputePolicyNote compact />
+          </div>
+        )}
+
+        {(status === 'RELEASED' || status === 'RESOLVED_RELEASED' || status === 'RESOLVED_REFUNDED' || status === 'RESOLVED_CREDITED') && (
+          <div className="text-sm text-ink/70 certificate p-4 space-y-2">
+            <p>
+              This order is closed. {status === 'RESOLVED_REFUNDED' ? 'Your payment was refunded.' : status === 'RESOLVED_CREDITED' ? 'The seller chose promotion credits.' : 'Payment has been released.'}
+            </p>
+            {status === 'RESOLVED_RELEASED' && transaction.complaintLogged && <p className="text-xs text-ink/60">Your report remains available to Escrit admins even though delivery confirmation released the funds.</p>}
+            {(status === 'RESOLVED_RELEASED' || status === 'RESOLVED_REFUNDED' || status === 'RESOLVED_CREDITED') && !transaction.complaintLogged && (
+              <>
+                <p className="text-xs text-ink/60 border-t border-line pt-2">
+                  This outcome was decided by Escrit&#39;s dispute team after reviewing your dispute.
+                </p>
+                {transaction.resolutionNote && (
+                  <p className="text-xs text-ink/60 break-words">
+                    <span className="font-medium text-ink/70">Reason given: </span>
+                    {transaction.resolutionNote}
+                  </p>
+                )}
+                {transaction.resolvedAt && (
+                  <p className="text-xs text-ink/45">
+                    Resolved {new Date(transaction.resolvedAt).toLocaleString()}
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {actionError && <p className="text-dispute text-sm mt-3 animate-fade-in-up" role="alert">{actionError}</p>}
+      {kycRequired && <Link to={`/settings?next=${encodeURIComponent(location.pathname)}`} className="mt-2 inline-block text-sm font-medium underline underline-offset-4">Complete identity details in Profile settings</Link>}
+
+      <SpotlightTour storageKey="escrit_buyer_tour" steps={TOUR_STEPS} active={Boolean(data) && !status} />
+    </div>
+  );
+}
+
+function CourseAccess({ course }) {
+  return <section className="certificate space-y-4 p-5"><div><p className="text-xs uppercase tracking-wider text-released">Course access unlocked</p><h2 className="mt-1 font-display text-xl">Your curriculum</h2></div>{course.deliveryFormat && <p className="text-sm text-ink/60">{course.deliveryFormat === 'live' ? 'Live course' : 'Self-paced course'}</p>}<ol className="space-y-3">{course.curriculum?.map((module, index) => <li key={`${module.title}-${index}`} className="border-t border-line pt-3"><h3 className="font-medium">{index + 1}. {module.title}</h3>{module.description && <p className="mt-1 text-sm leading-6 text-ink/65">{module.description}</p>}{module.videoUrl && <a href={module.videoUrl} target="_blank" rel="noreferrer" className="mt-2 inline-block text-sm underline underline-offset-4">Open lesson video</a>}</li>)}</ol></section>;
+}

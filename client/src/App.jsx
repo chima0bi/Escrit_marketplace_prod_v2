@@ -1,0 +1,82 @@
+import { Routes, Route, Navigate } from 'react-router-dom';
+import Layout from './components/Layout.jsx';
+import RequireAuth from './components/RequireAuth.jsx';
+
+import Home from './pages/Home.jsx';
+import Marketplace from './pages/Marketplace.jsx';
+import CreateMarketplaceListing from './pages/CreateMarketplaceListing.jsx';
+import Login from './pages/seller/Login.jsx';
+import Register from './pages/seller/Register.jsx';
+import ForgotPassword from './pages/seller/ForgotPassword.jsx';
+import ResetPassword from './pages/seller/ResetPassword.jsx';
+import VerifyEmail from './pages/seller/VerifyEmail.jsx';
+import Dashboard from './pages/seller/Dashboard.jsx';
+import CreateLink from './pages/seller/CreateLink.jsx';
+import LinkDetail from './pages/seller/LinkDetail.jsx';
+import BankAccount from './pages/seller/BankAccount.jsx';
+import ProfileSettings from './pages/seller/ProfileSettings.jsx';
+import Disputes from './pages/admin/Disputes.jsx';
+import AdminQueue from './pages/admin/AdminQueue.jsx';
+import PlatformSettings from './pages/admin/PlatformSettings.jsx';
+
+import PublicLinkPage from './pages/buyer/PublicLinkPage.jsx';
+import Result from './pages/buyer/Result.jsx';
+import BuyerLists from './pages/buyer/BuyerLists.jsx';
+import MarketplaceListing from './pages/MarketplaceListing.jsx';
+import SellerStorefront from './pages/SellerStorefront.jsx';
+import BuyerOrders from './pages/buyer/BuyerOrders.jsx';
+import ServiceOffers from './pages/buyer/ServiceOffers.jsx';
+import ProductOffers from './pages/buyer/ProductOffers.jsx';
+import PlatformCredits from './pages/seller/PlatformCredits.jsx';
+
+export default function App() {
+  return (
+    <Layout>
+      <Routes>
+        {/* Public marketing page */}
+        <Route path="/" element={<Home />} />
+        <Route path="/marketplace" element={<Marketplace />} />
+        <Route path="/marketplace/seller/:sellerId" element={<SellerStorefront />} />
+        <Route path="/marketplace/:type/:id" element={<MarketplaceListing />} />
+        <Route path="/marketplace/new/:type" element={<RequireAuth><CreateMarketplaceListing /></RequireAuth>} />
+
+        {/* Seller: account */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/verify-email" element={<RequireAuth><VerifyEmail /></RequireAuth>} />
+
+        {/* Seller: signed in */}
+        <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
+        <Route path="/dashboard/new" element={<RequireAuth><CreateLink /></RequireAuth>} />
+        <Route path="/dashboard/links/:id" element={<RequireAuth><LinkDetail /></RequireAuth>} />
+        <Route path="/dashboard/bank" element={<RequireAuth><BankAccount /></RequireAuth>} />
+        <Route path="/settings" element={<RequireAuth><ProfileSettings /></RequireAuth>} />
+        <Route path="/account/cart" element={<RequireAuth><BuyerLists mode="cart" /></RequireAuth>} />
+        <Route path="/account/favorites" element={<RequireAuth><BuyerLists mode="favorites" /></RequireAuth>} />
+        <Route path="/account/orders" element={<RequireAuth><BuyerOrders /></RequireAuth>} />
+        <Route path="/account/offers" element={<RequireAuth><ServiceOffers /></RequireAuth>} />
+        <Route path="/account/offers/:offerId" element={<RequireAuth><ServiceOffers /></RequireAuth>} />
+        <Route path="/account/price-offers" element={<RequireAuth><ProductOffers /></RequireAuth>} />
+        <Route path="/account/credits" element={<RequireAuth><PlatformCredits /></RequireAuth>} />
+
+        {/* Admin: the API enforces the ADMIN_EMAILS allowlist */}
+        <Route path="/admin/disputes" element={<RequireAuth><Disputes /></RequireAuth>} />
+        <Route path="/admin/complaints" element={<RequireAuth><AdminQueue mode="complaints" /></RequireAuth>} />
+        <Route path="/admin/kyc" element={<RequireAuth><AdminQueue mode="kyc" /></RequireAuth>} />
+        <Route path="/admin/listings" element={<RequireAuth><AdminQueue mode="listings" /></RequireAuth>} />
+        <Route path="/admin/categories" element={<RequireAuth><AdminQueue mode="categories" /></RequireAuth>} />
+        <Route path="/admin/users" element={<RequireAuth><AdminQueue mode="users" /></RequireAuth>} />
+        <Route path="/admin/settings" element={<RequireAuth><PlatformSettings /></RequireAuth>} />
+
+        {/* Public listing and order views. Checkout requires a signed-in buyer. */}
+        <Route path="/r/:linkId" element={<PublicLinkPage />} />
+        <Route path="/r/:linkId/t/:txId" element={<PublicLinkPage />} />
+        <Route path="/r/:linkId/t/:txId/result" element={<Result />} />
+
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Layout>
+  );
+}
