@@ -39,10 +39,10 @@ in development.
 
 See `.env.example`. In short:
 
-| Variable                | Required | Purpose                                               |
-| ------------------------ | -------- | ------------------------------------------------------ |
+| Variable                | Required        | Purpose                                   |
+| ------------------------------------------------------------------------------------ |
 | `VITE_API_URL`          | Production only | Full URL of the deployed API (client and server live on different domains). |
-| `VITE_GOOGLE_CLIENT_ID` | No       | Enables the "Continue with Google" button.            |
+| `VITE_GOOGLE_CLIENT_ID` | No              | Enables the "Continue with Google" button.            |
 
 ## Photo uploads
 

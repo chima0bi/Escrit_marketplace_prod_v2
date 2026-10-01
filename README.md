@@ -3,20 +3,19 @@
 A Nigerian marketplace for products, courses and services where every purchase is protected by escrow.
 Built for the StacStart Borderless Bytes Hackathon (FinTech & Commerce track).
 
-- **Live app:** `[LIVE_URL]`
-- **Demo video:** `[VIDEO_URL]`
+- **Live app:** `https://escrit-marketplace-prod-v2.vercel.app`
+- **Demo video:** `https://vimeo.com/1231819082`
 
 ## What it does
-Buyers browse, favourite, add to cart, make offers and check out once. Escrit charges through Paystack, holds the money in an escrow order per listing, and releases it to the seller's verified bank account only after the buyer confirms (or an admin resolves a dispute). See `server/README.md` for the money flow and `docs/` for the demo script and submission material.
+Buyers browse, favourite, add to cart, make offers and check out once. Escrit charges through Paystack, holds the money in an escrow order per listing, and releases it to the seller's verified bank account only after the buyer confirms (or an admin resolves a dispute). See `server/README.md` for the money flow.
 
 ## Repo layout
 - `client/` React + Vite + Tailwind web app (deploy to Vercel)
 - `server/` Express + MongoDB API, Socket.IO, payment adapters (deploy to Render)
-- `docs/` demo script, video prompt, submission kit, judge assessment
 
 ## Run locally
 ```bash
-cd server && npm install && cp .env.example .env   # fill Mongo, JWT and Paystack TEST keys
+cd server && npm install && cp .env.example .env  
 npm run dev
 cd ../client && npm install && cp .env.example .env
 npm run dev

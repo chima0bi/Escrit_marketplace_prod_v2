@@ -42,7 +42,7 @@ and payouts all read whichever pair is currently active.
 
 ```bash
 npm install
-cp .env.example .env      # fill in Mongo, JWT secrets and Paystack keys
+cp .env.example .env      
 npm run dev
 ```
 
